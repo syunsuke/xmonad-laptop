@@ -15,9 +15,7 @@ import qualified XMonad.Actions.DynamicWorkspaceOrder as DO
 
 import XMonad.Layout.AutoMaster
 import XMonad.Layout.Circle
-import XMonad.Layout.Roledex
-import XMonad.Layout.PerWorkspace
-import XMonad.Layout.Mosaic
+--import XMonad.Layout.PerWorkspace
 import XMonad.Layout.MagicFocus
 import XMonad.Layout.Spacing
 import XMonad.Layout.NoBorders
@@ -25,15 +23,14 @@ import XMonad.Layout.Renamed
 
 import XMonad.Util.EZConfig
 import XMonad.Util.Run
-import XMonad.Util.Scratchpad
+import XMonad.Util.NamedScratchpad
 
 import XMonad.Prompt.Workspace
 import XMonad.Prompt
 
 
 main :: IO ()
-main = do
-  xmonad =<< myStatusBar myConfig
+main = xmonad =<< myStatusBar myConfig
 
 myConfig = defaultConfig { terminal = "urxvt"
                          , modMask = mod4Mask
@@ -43,19 +40,19 @@ myConfig = defaultConfig { terminal = "urxvt"
                          , manageHook = myManageHook
                          , handleEventHook = myEventHook
                          , layoutHook = myLayout
-                         , keys = (\c -> mkKeymap c (myKeyMap c))
+                         , keys = \c -> mkKeymap c (myKeyMap c)
                          }
 
 ---------------------------------------------
 -- 新規ウインド配置の管理 manageHook
 ---------------------------------------------
 myManageHook =  scPadManageHook <+>
-  (composeOne $ [ isFullscreen -?> doFullFloat
+  composeOne ( [ isFullscreen -?> doFullFloat
                 , transience
-                ]
-             ++ [ title   =? "オプション" -?> doCenterFloat ]
-             ++ [ className =? c -?> doCenterFloat | c <- center_floats]
-             ++ [ className =? c -?> doFloat       | c <- floats])
+               ]
+            ++ [ title   =? "オプション" -?> doCenterFloat ]
+            ++ [ className =? c -?> doCenterFloat | c <- center_floats]
+            ++ [ className =? c -?> doFloat       | c <- floats])
     where
       center_floats =
         [ "MPlayer"
@@ -66,8 +63,7 @@ myManageHook =  scPadManageHook <+>
       floats = 
         ["Gimp"]
 
-      scPadManageHook =
-        scratchpadManageHook $ W.RationalRect 0.1 0.1 0.8 0.8
+      scPadManageHook = namedScratchpadManageHook scratchpads
 
 ---------------------------------------------
 -- イベントフック
@@ -106,7 +102,7 @@ myKeyMap conf =
 
   ,("M-,", sendMessage $ IncMasterN 1)
   ,("M-.", sendMessage $ IncMasterN (-1))
-  ,("M-S-q", io (exitWith ExitSuccess))
+  ,("M-S-q", io exitSuccess)
   ,("M-q", spawn myRecompileCmd )
   
   ,("M-<R>", DO.moveTo Next HiddenNonEmptyWS)
@@ -114,7 +110,8 @@ myKeyMap conf =
   ,("M-C-<R>", DO.moveTo Next AnyWS)
   ,("M-C-<L>", DO.moveTo Prev AnyWS)
   
-  ,("M-o", scratchpadSpawnActionCustom $ customTerm1 ++ " -name scratchpad")
+  ,("M-o", namedScratchpadAction scratchpads "ScratchPad")
+  ,("M-i", namedScratchpadAction scratchpads "ScratchPad2")
   ]
 
   -- workspaceの移動等
@@ -138,17 +135,27 @@ myKeyMap conf =
 -- ターミナル関連
 ---------------------------------------------
 customTerm1 = "urxvt -depth 32 -bg '[80]#003f3f' "
+customTerm2 = "urxvt -depth 32 -bg '[80]#3f003f' "
+
+---------------------------------------------
+-- スクラッチパッド 
+---------------------------------------------
+scratchpads =
+  [ NS "ScratchPad" (customTerm1 ++ "-title ScratchPad") (title =? "ScratchPad") centerfloat
+  , NS "ScratchPad2" (customTerm2 ++ "-title ScratchPad2") (title =? "ScratchPad2") defaultFloating
+  ]
+  where centerfloat = customFloating $ W.RationalRect (1/6) (1/6) (2/3) (2/3)
 
 ---------------------------------------------
 -- レイアウト関連
 ---------------------------------------------
 myLayout = smartBorders . renamed [CutWordsLeft 2] . spacing 4 $ myBaseLayout
 
-myBaseLayout = (renamed [Replace "MT"] $ Mirror $ Tall 1 (3/100) (4/5))
-          ||| (renamed [Replace "MaT"] $ Mirror $ magicFocus $ Tall 1 (3/100) (4/5))
-          ||| (renamed [Replace "T" ] $ Tall 1 (3/100) (3/5))
-          ||| (renamed [Replace "F" ] Full )
-          ||| (magicFocus $ autoMaster 1 (3/100) Circle)
+myBaseLayout = renamed [Replace "MT"] (Mirror $ Tall 2 (3/100) (3/5))
+          ||| renamed [Replace "MaT"] (Mirror $ magicFocus $ Tall 1 (3/100) (4/5))
+          ||| renamed [Replace "T" ] (Tall 1 (3/100) (3/5))
+          ||| renamed [Replace "F" ] Full
+          ||| magicFocus (autoMaster 1 (3/100) Circle)
 
 
 ---------------------------------------------
@@ -158,10 +165,6 @@ data TopicItem = TI { topicName   :: Topic
                     , topicDir    :: Dir 
                     , topicAction :: X ()
                     }
-
-data MyTerminal = MyTerminal { terminalCmd :: String
-                             , myShell     :: String
-                             }
 
 mkTopicConfig :: [TopicItem] -> TopicConfig
 mkTopicConfig items@(x:xs)  = 
@@ -174,15 +177,17 @@ mkTopicConfig items@(x:xs)  =
 
 -- mytopicにデータを設定する
 mytopics = 
-  [ TI "home"       ""            (spawnShell)
-  , TI "misc"       ""            (spawnShell)
+  [ TI "home"       ""            spawnShell
+  , TI "misc"       ""            spawnShell
+  , TI "code"       "~/code"      (spawnShell >*> 2)
+  , TI "tmp"        "~/tmp"       spawnShell
   , TI "web"        ""            (spawn "chromium")
-  , TI "code"       "~/code"      (spawnShell)
-  , TI "tmp"        "~/tmp"       (spawnShell)
+  , TI "firefox"    ""            (spawn "firefox")
   , TI "navi2ch"    ""            (spawn "emacs -f navi2ch")
   , TI "skype"      ""            (spawn "skype")
-  , TI "xmonad"     "~/.xmonad"   (spawnShell >*> 2)
-  ]
+  , TI "network"    ""            (spawn $ locale_en ++ "urxvt -e wicd-curses")
+  , TI "xmonad"     "~/.xmonad"   spawnShell
+   ]
 
 myWorkspaces = [ n | TI n _ _ <- mytopics]
 
@@ -198,8 +203,10 @@ spawnShell  = currentTopicDir myTopicData >>= spawnShellIn
 
 -- 任意のディレクトリに移動してターミナルを開くアクション
 spawnShellIn :: Dir -> X()
-spawnShellIn [] = spawn "urxvt -ls -cd ~/" 
-spawnShellIn d  = spawn $ "urxvt -ls -cd " ++ d
+spawnShellIn [] = spawn $ locale_en ++ "urxvt -cd ~/" 
+spawnShellIn d  = spawn $ locale_en ++ "urxvt -cd " ++ d
+
+locale_en = "LANG=en_US.UTF-8 "
 
 -- *************************
 -- ワークスペース移動用（キーバインドする）
@@ -246,6 +253,7 @@ myStatusBar conf = do
                              , ppUrgent  = dzenColor "#ff0000" "" . wrap " " " "
                              , ppSep     = " : "
                              , ppLayout  = dzenColor "#aaaaaa" ""
+                             , ppSort    = fmap ( . namedScratchpadFilterOutWorkspace) (ppSort defaultPP)
                              , ppOutput  = hPutStrLn h
                              }
 
