@@ -151,7 +151,7 @@ scratchpads =
 ---------------------------------------------
 myLayout = smartBorders . renamed [CutWordsLeft 2] . spacing 4 $ myBaseLayout
 
-myBaseLayout = renamed [Replace "MT"] (Mirror $ Tall 2 (3/100) (3/5))
+myBaseLayout = renamed [Replace "MT"] (Mirror $ Tall 1 (3/100) (3/5))
           ||| renamed [Replace "MaT"] (Mirror $ magicFocus $ Tall 1 (3/100) (4/5))
           ||| renamed [Replace "T" ] (Tall 1 (3/100) (3/5))
           ||| renamed [Replace "F" ] Full
@@ -237,8 +237,8 @@ myXPConfig = defaultXPConfig
 -- ステータスバー関連
 ---------------------------------------------
 myStatusBar conf = do
-  left_bar <- spawnPipe $ "dzen2 -x 0 -w 700 -ta l " ++ common_style
-  spawn $ "conky -c ~/.xmonad/conky_dzen | dzen2 -x 700 -ta r " ++ common_style
+  left_bar <- spawnPipe $ "dzen2 -x 0 -w 600 -ta l " ++ common_style
+  spawn $ "conky -c ~/.xmonad/conky_dzen | dzen2 -x 600 -w 666 -ta r " ++ common_style
   return $ conf { layoutHook = avoidStruts $ layoutHook conf
                 , manageHook = manageHook conf <+> manageDocks
                 , handleEventHook = handleEventHook conf <+> docksEventHook
@@ -246,7 +246,7 @@ myStatusBar conf = do
                 }
     where
       -- dzenのオプションの共通部分
-      common_style = "-h '20' -fg '#aaaaaa' -bg '#000000' -fn 'M+ 1mn:size=10'"
+      common_style = "-h '20' -fg '#aaaaaa' -bg '#000000' -fn 'M+ 1mn:size=11'"
       -- ppカスタマイズ
       myDzenPP h = defaultPP { ppCurrent = dzenColor "#00ffaa" "" . wrap "[" "]"
                              , ppHidden  = dzenColor "#00aa11" "" . wrap "" ""
