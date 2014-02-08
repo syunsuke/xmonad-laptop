@@ -1,5 +1,7 @@
+{-# OPTIONS_GHC -W -fno-warn-missing-signatures #-}
 import System.Exit
 import qualified Data.Map as M
+import Graphics.X11.Xlib.Display
 
 import XMonad
 import qualified XMonad.StackSet as W
@@ -136,6 +138,15 @@ myKeyMap conf =
 
 
 ---------------------------------------------
+-- グリッドセレクト関連
+---------------------------------------------
+
+
+
+
+
+
+---------------------------------------------
 -- ターミナル関連
 ---------------------------------------------
 customTerm1 = "urxvt -depth 32 -bg '[80]#003f3f' "
@@ -240,17 +251,41 @@ myXPConfig = defaultXPConfig
 -- ステータスバー関連
 ---------------------------------------------
 myStatusBar conf = do
-  left_bar <- spawnPipe $ "dzen2 -x 0 -w 600 -ta l " ++ common_style
-  spawn $ "conky -c ~/.xmonad/conky_dzen | dzen2 -x 600 -w 666 -ta r " ++ common_style
-  spawn "stalonetray"
+
+  -- screen0の横幅を得る
+  sw <- getScreenWidth 0
+
+  -- 左側 xmonad-dzen
+  left_bar <- spawnPipe $ "dzen2 -x 0 -w " ++ (show $ l_width sw) ++ " -ta l " ++ common_style
+
+  -- 右側 conky-dzen
+  spawn $ "conky -c ~/.xmonad/conky_dzen | dzen2 -x " ++ (show $ l_width sw)
+           ++ " -w " ++ (show $ r_width sw) ++ " -ta r " ++ common_style
+
+  -- stalonetray起動
+  spawn $ "stalonetray -bg \"#000000\" --icon-gravity SE --grow-gravity SW -i 16 "
+        ++ "--kludges force_icons_size "
+        ++ "-s " ++ (show tray_slot)
+        ++ " --geometry " ++ (show icon_len) ++ "+" ++ (show $ tray_geo_x sw)
+
   return $ conf { layoutHook = avoidStruts $ layoutHook conf
                 , manageHook = manageHook conf <+> manageDocks
                 , handleEventHook = handleEventHook conf <+> docksEventHook
                 , logHook    = dynamicLogWithPP $  myDzenPP left_bar
                 }
     where
+      -- barの長さを計算
+      l_rate = 0.53
+      l_width sw = round (fromIntegral sw * l_rate)
+      r_width sw = sw - (l_width sw) - (tray_slot * icon_len)
+      bar_height = 20
+      tray_geo_x sw = l_width sw + r_width sw
+      tray_slot = bar_height
+      icon_len = 3
+
       -- dzenのオプションの共通部分
-      common_style = "-h '20' -fg '#aaaaaa' -bg '#000000' -fn 'M+ 1mn:size=11'"
+      common_style = "-h " ++ (show bar_height) ++  " -fg '#aaaaaa' -bg '#000000' -fn 'M+ 1mn:size=11'"
+
       -- ppカスタマイズ
       myDzenPP h = defaultPP { ppCurrent = dzenColor "#00ffaa" "" . wrap "[" "]"
                              , ppHidden  = dzenColor "#00aa11" "" . wrap "" ""
@@ -261,4 +296,8 @@ myStatusBar conf = do
                              , ppSort    = fmap ( . namedScratchpadFilterOutWorkspace) (ppSort defaultPP)
                              , ppOutput  = hPutStrLn h
                              }
+
+getScreenWidth s = do
+  dsp <- openDisplay ""
+  return $ displayWidth dsp s
 
