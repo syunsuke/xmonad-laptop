@@ -15,11 +15,13 @@ import qualified XMonad.Actions.DynamicWorkspaceOrder as DO
 
 import XMonad.Layout.AutoMaster
 import XMonad.Layout.Circle
---import XMonad.Layout.PerWorkspace
 import XMonad.Layout.MagicFocus
 import XMonad.Layout.Spacing
 import XMonad.Layout.NoBorders
 import XMonad.Layout.Renamed
+import XMonad.Layout.MultiToggle
+import XMonad.Layout.MultiToggle.Instances
+
 
 import XMonad.Util.EZConfig
 import XMonad.Util.Run
@@ -112,6 +114,8 @@ myKeyMap conf =
   
   ,("M-o", namedScratchpadAction scratchpads "ScratchPad")
   ,("M-i", namedScratchpadAction scratchpads "ScratchPad2")
+ 
+  ,("M-f", sendMessage $ Toggle FULL)
   ]
 
   -- workspaceの移動等
@@ -128,7 +132,7 @@ myKeyMap conf =
 
     where
       myRecompileCmd =
-        "xmonad --recompile && (killall dzen2; xmonad --restart) && xmessage recompile done"
+        "xmonad --recompile && (killall stalonetray; killall dzen2; xmonad --restart) && xmessage recompile done"
 
 
 ---------------------------------------------
@@ -149,12 +153,11 @@ scratchpads =
 ---------------------------------------------
 -- レイアウト関連
 ---------------------------------------------
-myLayout = smartBorders . renamed [CutWordsLeft 2] . spacing 4 $ myBaseLayout
+myLayout = smartBorders . renamed [CutWordsLeft 2] . spacing 4 . mkToggle1 FULL $ myBaseLayout
 
 myBaseLayout = renamed [Replace "MT"] (Mirror $ Tall 1 (3/100) (3/5))
           ||| renamed [Replace "MaT"] (Mirror $ magicFocus $ Tall 1 (3/100) (4/5))
           ||| renamed [Replace "T" ] (Tall 1 (3/100) (3/5))
-          ||| renamed [Replace "F" ] Full
           ||| magicFocus (autoMaster 1 (3/100) Circle)
 
 
@@ -239,6 +242,7 @@ myXPConfig = defaultXPConfig
 myStatusBar conf = do
   left_bar <- spawnPipe $ "dzen2 -x 0 -w 600 -ta l " ++ common_style
   spawn $ "conky -c ~/.xmonad/conky_dzen | dzen2 -x 600 -w 666 -ta r " ++ common_style
+  spawn "stalonetray"
   return $ conf { layoutHook = avoidStruts $ layoutHook conf
                 , manageHook = manageHook conf <+> manageDocks
                 , handleEventHook = handleEventHook conf <+> docksEventHook
@@ -253,6 +257,7 @@ myStatusBar conf = do
                              , ppUrgent  = dzenColor "#ff0000" "" . wrap " " " "
                              , ppSep     = " : "
                              , ppLayout  = dzenColor "#aaaaaa" ""
+                             , ppTitle   = dzenColor "#ffcc55" "#555555" . wrap " " " "
                              , ppSort    = fmap ( . namedScratchpadFilterOutWorkspace) (ppSort defaultPP)
                              , ppOutput  = hPutStrLn h
                              }
