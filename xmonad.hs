@@ -2,6 +2,8 @@
 import System.Exit
 import qualified Data.Map as M
 import Graphics.X11.Xlib.Display
+--import Foreign.C.Types (CInt)
+import System.Posix.Unistd
 
 import XMonad
 import qualified XMonad.StackSet as W
@@ -123,7 +125,7 @@ myKeyMap conf =
   -- workspaceの移動等
   ++
   [("M-" ++ m ++ show k , f i)
-    | (i,k) <- zip (XMonad.workspaces conf) [1..9]
+    | (i,k) <- zip (XMonad.workspaces conf) ([1..9] :: [Int])
     , (f,m) <- [(goto, ""),(windows . W.shift, "S-")]
   ]
 
@@ -181,11 +183,11 @@ data TopicItem = TI { topicName   :: Topic
                     }
 
 mkTopicConfig :: [TopicItem] -> TopicConfig
-mkTopicConfig items@(x:xs)  = 
+mkTopicConfig items = 
   TopicConfig { topicDirs    = M.fromList [(t,d)| TI t d _ <- items]
               , topicActions = M.fromList [(t,x)| TI t _ x <- items]
               , defaultTopicAction = const $ return ()
-              , defaultTopic = topicName x
+              , defaultTopic = topicName $ head items 
               , maxTopicHistory = 10
               }
 
@@ -250,23 +252,56 @@ myXPConfig = defaultXPConfig
 ---------------------------------------------
 -- ステータスバー関連
 ---------------------------------------------
+data BarSizeConfig =
+  BarSizeConfig { bsc_r_width :: Int
+                , bsc_bar_height :: Int
+                , bsc_icon_len :: Int
+  }
+
+data BarSize =
+  BarSize { l_width :: Int
+          , r_width :: Int
+          , bar_height :: Int
+          , icon_len :: Int
+          }
+
+barsize_host :: String -> BarSizeConfig
+barsize_host host_name = case host_name of
+  "iiyama"    -> BarSizeConfig 600 20 4
+  "madokita"  -> BarSizeConfig 500 20 4
+  _           -> BarSizeConfig 500 20 4
+
+myGetBarSize :: IO BarSize
+myGetBarSize = do
+  host_name <- fmap nodeName getSystemID
+  sw <- getScreenWidth 0
+  return $ BarSize { l_width = let r  = bsc_r_width $ barsize_host host_name
+                                   iw = bsc_bar_height $ barsize_host host_name
+                                   il = bsc_icon_len $ barsize_host host_name
+                                   sw' = fromIntegral sw
+                               in sw' - r - iw * il
+                   , r_width = bsc_r_width $ barsize_host host_name
+                   , bar_height = bsc_bar_height $ barsize_host host_name
+                   , icon_len = bsc_icon_len $ barsize_host host_name
+                   }
+ 
 myStatusBar conf = do
 
-  -- screen0の横幅を得る
-  sw <- getScreenWidth 0
+  -- ホスト毎のバーサイズを取得
+  bs <- myGetBarSize
 
   -- 左側 xmonad-dzen
-  left_bar <- spawnPipe $ "dzen2 -x 0 -w " ++ (show $ l_width sw) ++ " -ta l " ++ common_style
+  left_bar <- spawnPipe $ "dzen2 -x 0 -w " ++ (show $ l_width bs) ++ " -ta l " ++ common_style bs
 
   -- 右側 conky-dzen
-  spawn $ "conky -c ~/.xmonad/conky_dzen | dzen2 -x " ++ (show $ l_width sw)
-           ++ " -w " ++ (show $ r_width sw) ++ " -ta r " ++ common_style
+  spawn $ "conky -c ~/.xmonad/conky_dzen | dzen2 -x " ++ (show $ l_width bs)
+           ++ " -w " ++ (show $ r_width bs) ++ " -ta r " ++ common_style bs
 
   -- stalonetray起動
   spawn $ "stalonetray -bg \"#000000\" --icon-gravity SE --grow-gravity SW -i 16 "
         ++ "--kludges force_icons_size "
-        ++ "-s " ++ (show tray_slot)
-        ++ " --geometry " ++ (show icon_len) ++ "+" ++ (show $ tray_geo_x sw)
+        ++ "-s " ++ (show $ bar_height bs)
+        ++ " --geometry " ++ (show $ icon_len bs) ++ "+" ++ (show $ (l_width bs) + (r_width bs))
 
   return $ conf { layoutHook = avoidStruts $ layoutHook conf
                 , manageHook = manageHook conf <+> manageDocks
@@ -274,17 +309,8 @@ myStatusBar conf = do
                 , logHook    = dynamicLogWithPP $  myDzenPP left_bar
                 }
     where
-      -- barの長さを計算
-      l_rate = 0.53
-      l_width sw = round (fromIntegral sw * l_rate)
-      r_width sw = sw - (l_width sw) - (tray_slot * icon_len)
-      bar_height = 20
-      tray_geo_x sw = l_width sw + r_width sw
-      tray_slot = bar_height
-      icon_len = 3
-
       -- dzenのオプションの共通部分
-      common_style = "-h " ++ (show bar_height) ++  " -fg '#aaaaaa' -bg '#000000' -fn 'M+ 1mn:size=11'"
+      common_style s = "-h " ++ (show $ bar_height s) ++  " -fg '#aaaaaa' -bg '#000000' -fn 'M+ 1mn:size=11'"
 
       -- ppカスタマイズ
       myDzenPP h = defaultPP { ppCurrent = dzenColor "#00ffaa" "" . wrap "[" "]"
@@ -292,7 +318,7 @@ myStatusBar conf = do
                              , ppUrgent  = dzenColor "#ff0000" "" . wrap " " " "
                              , ppSep     = " : "
                              , ppLayout  = dzenColor "#aaaaaa" ""
-                             , ppTitle   = dzenColor "#ffcc55" "#555555" . wrap " " " "
+                             , ppTitle   = dzenColor "#ffcc55" "#555555" . shorten 30  . pad 
                              , ppSort    = fmap ( . namedScratchpadFilterOutWorkspace) (ppSort defaultPP)
                              , ppOutput  = hPutStrLn h
                              }
