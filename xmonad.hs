@@ -268,7 +268,7 @@ data BarSize =
 barsize_host :: String -> BarSizeConfig
 barsize_host host_name = case host_name of
   "iiyama"    -> BarSizeConfig 600 20 4
-  "madokita"  -> BarSizeConfig 500 20 4
+  "madokita"  -> BarSizeConfig 530 18 3
   _           -> BarSizeConfig 500 20 4
 
 myGetBarSize :: IO BarSize
@@ -309,8 +309,13 @@ myStatusBar conf = do
                 , logHook    = dynamicLogWithPP $  myDzenPP left_bar
                 }
     where
+      f_size s = let h' = fromIntegral $ bar_height s
+                     rate = 0.5
+                 in (round $ h' * rate ) :: Int
+
       -- dzenのオプションの共通部分
-      common_style s = "-h " ++ (show $ bar_height s) ++  " -fg '#aaaaaa' -bg '#000000' -fn 'M+ 1mn:size=11'"
+      common_style s = "-h " ++ (show $ bar_height s) 
+                       ++  " -fg '#aaaaaa' -bg '#000000' -fn 'M+ 1mn:size=" ++ (show $ f_size s) ++ "'"
 
       -- ppカスタマイズ
       myDzenPP h = defaultPP { ppCurrent = dzenColor "#00ffaa" "" . wrap "[" "]"
