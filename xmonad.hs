@@ -201,11 +201,14 @@ mytopics =
   , TI "tmp"        "~/tmp"       spawnShell
   , TI "web"        ""            (spawn "chromium")
   , TI "firefox"    ""            (spawn "firefox")
+  , TI "topcoder"   "~/topcoder"  (spawn $ "javaws " ++ arenafile)
   , TI "navi2ch"    ""            (spawn "emacs -f navi2ch")
   , TI "skype"      ""            (spawn "skype")
   , TI "network"    ""            (spawn $ locale_en ++ "urxvt -e wicd-curses")
   , TI "xmonad"     "~/.xmonad"   spawnShell
    ]
+
+arenafile = "~/topcoder/ContestAppletProd.jnlp"
 
 myWorkspaces = [ n | TI n _ _ <- mytopics]
 
