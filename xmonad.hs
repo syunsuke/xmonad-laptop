@@ -8,6 +8,7 @@ import System.Posix.Unistd
 import XMonad
 import qualified XMonad.StackSet as W
 
+import XMonad.Hooks.SetWMName
 import XMonad.Hooks.DynamicLog
 import XMonad.Hooks.ManageDocks (avoidStruts,manageDocks,docksEventHook)
 import XMonad.Hooks.ManageHelpers
@@ -46,6 +47,7 @@ myConfig = defaultConfig { terminal = "urxvt"
                          , manageHook = myManageHook
                          , handleEventHook = myEventHook
                          , layoutHook = myLayout
+                         , startupHook = setWMName "LG3D"
                          , keys = \c -> mkKeymap c (myKeyMap c)
                          }
 
